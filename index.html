@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Tetri Sélectif</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap');
+
+:root{
+  --sky1:#1565C0;--sky2:#1E88E5;--green:#43A047;
+  --gold:#FFD600;--red:#E53935;
+  --panel:rgba(10,30,80,.82);--border:rgba(100,160,255,.25);
+  --glow:#FFD600;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+
+html,body{
+  width:100%;height:100%;
+  display:flex;flex-direction:column;align-items:stretch;
+  overflow:hidden;touch-action:manipulation;
+  user-select:none;-webkit-user-select:none;
+  font-family:'Fredoka One',cursive;
+  background:linear-gradient(170deg,#0d47a1 0%,#1976d2 35%,#2196f3 60%,#388e3c 85%,#2e7d32 100%);
+}
+
+/* ═══ HILLS ═══ */
+#hills{
+  position:fixed;bottom:0;left:0;right:0;height:60px;
+  pointer-events:none;z-index:1;overflow:hidden;
+}
+#hills svg{width:100%;height:100%;}
+
+/* ═══ HEADER ═══ */
+#header{
+  flex-shrink:0;text-align:center;padding:5px 8px 2px;
+  position:relative;z-index:2;
+}
+#header h1{
+  font-size:clamp(1.3rem,6vw,2rem);color:#fff;
+  text-shadow:3px 3px 0 #0d47a1,0 0 20px rgba(255,214,0,.6);
+  letter-spacing:2px;line-height:1;
+}
+#header h1 span{color:var(--gold);text-shadow:2px 2px 0 #e65100,0 0 16px #FFD600;}
+#header p{font-size:.5rem;color:rgba(255,255,255,.55);letter-spacing:2px;text-transform:uppercase;}
+
+/* ═══ STATS BAR ═══ */
+#statsBar{
+  flex-shrink:0;display:flex;gap:5px;
+  padding:2px 8px;position:relative;z-index:2;
+}
+.sbox{
+  flex:1;background:var(--panel);border:1px solid var(--border);
+  border-radius:8px;padding:3px 6px;text-align:center;
+  backdrop-filter:blur(4px);min-width:0;
+}
+.slabel{font-size:.45rem;color:rgba(255,214,0,.85);text-transform:uppercase;letter-spacing:.5px;}
+.sval{font-size:1rem;color:#fff;line-height:1.2;}
+#recycleVal{color:#69f0ae;}
+
+/* ═══ LAYOUT ═══ */
+#layout{display:flex;flex-direction:column;flex:1;min-height:0;position:relative;z-index:2;}
+
+/* ═══ MIDDLE ═══ */
+#middle{flex:1;display:flex;flex-direction:row;gap:5px;padding:3px 6px;min-height:0;overflow:hidden;}
+
+/* ═══ BOARD ═══ */
+#boardWrap{flex-shrink:0;position:relative;}
+#gameCanvas{
+  display:block;border:3px solid rgba(255,255,255,.3);
+  background:rgba(5,15,40,.9);border-radius:6px;touch-action:none;
+  box-shadow:0 4px 24px rgba(0,0,0,.5),inset 0 0 30px rgba(0,0,50,.3);
+}
+#gameCanvas.hammer-mode{border-color:var(--gold);animation:hamBorder .7s infinite;}
+@keyframes hamBorder{
+  0%,100%{box-shadow:0 0 12px rgba(255,214,0,.4),0 4px 24px rgba(0,0,0,.5);}
+  50%{box-shadow:0 0 40px rgba(255,214,0,1),0 4px 24px rgba(0,0,0,.5);}
+}
+#bonusFlash{
+  position:absolute;top:8px;left:0;right:0;text-align:center;
+  font-size:.95rem;color:var(--gold);
+  text-shadow:0 0 12px var(--gold),2px 2px 0 #000;
+  pointer-events:none;opacity:0;transition:opacity .4s;z-index:5;
+}
+#msgBanner{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  background:rgba(10,25,70,.96);border:3px solid var(--gold);
+  border-radius:16px;padding:18px 20px;text-align:center;
+  display:none;z-index:20;box-shadow:0 0 40px rgba(255,214,0,.4);
+  width:90%;max-width:300px;
+}
+#msgBanner h2{font-size:1.3rem;color:var(--gold);margin-bottom:6px;text-shadow:2px 2px 0 #000;}
+#msgBanner p{font-size:.62rem;color:#b0d0ff;margin-bottom:12px;line-height:1.6;white-space:pre-line;}
+.bigbtn{
+  background:linear-gradient(135deg,#FFD600,#ff8f00);color:#000;
+  border:none;border-radius:10px;padding:10px 22px;
+  font-family:'Fredoka One',cursive;font-size:1rem;cursor:pointer;
+  box-shadow:0 4px 12px rgba(255,214,0,.5);touch-action:manipulation;
+}
+.bigbtn:active{transform:scale(.95);}
+
+/* ═══ SIDE PANEL ═══ */
+#side{
+  flex:1;min-width:78px;max-width:120px;
+  display:flex;flex-direction:column;gap:4px;
+  overflow-y:auto;overflow-x:hidden;
+}
+#side::-webkit-scrollbar{display:none;}
+.card{
+  background:var(--panel);border:1px solid var(--border);
+  border-radius:8px;padding:5px 6px;flex-shrink:0;
+  backdrop-filter:blur(4px);
+}
+.ctitle{
+  font-size:.5rem;color:var(--gold);text-transform:uppercase;letter-spacing:1px;
+  margin-bottom:3px;text-shadow:1px 1px 0 rgba(0,0,0,.5);
+}
+
+/* Next */
+#nextCard{text-align:center;}
+#nextCanvas{display:block;margin:2px auto 0;background:rgba(5,15,40,.8);border:1px solid var(--border);border-radius:4px;}
+
+/* Hammer */
+#hamCard{display:none;border-color:rgba(255,214,0,.5);}
+#hamCard .ctitle{color:var(--gold);}
+#hamEmoji{font-size:1.4rem;display:block;text-align:center;animation:hP .7s infinite alternate;}
+@keyframes hP{from{transform:rotate(-12deg) scale(.93)}to{transform:rotate(12deg) scale(1.12)}}
+#hamTxt{font-size:.8rem;color:var(--gold);display:block;text-align:center;margin:1px 0 4px;}
+.hbtn{
+  border:none;border-radius:6px;padding:5px 4px;
+  font-family:'Fredoka One',cursive;font-size:.58rem;cursor:pointer;
+  display:block;width:100%;margin-top:3px;touch-action:manipulation;
+}
+.huse{background:linear-gradient(135deg,var(--gold),#ff8f00);color:#000;}
+.hcancel{background:rgba(255,60,60,.2);color:#ff8a80;border:1px solid #f44;display:none;}
+
+/* Progress */
+#progCard{flex-shrink:0;}
+#progBar{height:5px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden;margin-bottom:3px;}
+#progFill{height:100%;width:0%;background:linear-gradient(90deg,var(--gold),#fff176);transition:width .3s;}
+#progLabel{font-size:.42rem;color:rgba(255,255,255,.6);line-height:1.3;margin-bottom:3px;}
+#tipTxt{font-size:.44rem;color:#a5d6a7;line-height:1.4;}
+
+/* Legend */
+#legCard{flex:1;}
+.lrow{
+  display:flex;align-items:center;gap:4px;
+  padding:4px 0;font-size:.48rem;color:#cfe8ff;
+  border-bottom:1px solid rgba(255,255,255,.06);
+  line-height:1.3;
+}
+.lrow:last-child{border-bottom:none;}
+.ldot{width:11px;height:11px;border-radius:3px;flex-shrink:0;border:2px solid rgba(255,255,255,.3);}
+
+/* ═══ CONTROLS ═══ */
+#controls{
+  flex-shrink:0;padding:3px 6px 8px;
+  display:flex;flex-direction:column;gap:4px;
+  position:relative;z-index:2;
+}
+.crow{display:flex;gap:5px;justify-content:center;}
+.cbtn{
+  flex:1;max-width:95px;height:50px;
+  background:rgba(10,30,80,.7);border:2px solid rgba(100,160,255,.3);
+  color:#cde;border-radius:10px;font-size:1.3rem;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  touch-action:manipulation;transition:all .1s;
+  backdrop-filter:blur(4px);text-shadow:1px 1px 0 #000;
+}
+.cbtn:active{background:rgba(255,214,0,.25);border-color:var(--gold);color:#fff;transform:scale(.91);}
+#btnHammer{
+  max-width:190px;height:50px;
+  background:rgba(255,140,0,.12);border-color:rgba(255,214,0,.5);
+  color:var(--gold);font-size:.78rem;
+}
+#btnHammer.active-h{background:rgba(255,50,50,.2);border-color:#f44;color:#ff8a80;}
+#btnHammer:disabled{opacity:.3;pointer-events:none;}
+
+/* ═══ QUIZ ═══ */
+#quizModal{
+  display:none;position:fixed;inset:0;z-index:100;
+  background:rgba(0,0,0,.8);align-items:center;justify-content:center;
+}
+#quizModal.show{display:flex;}
+#quizBox{
+  background:linear-gradient(160deg,#0d2060,#0a3020);
+  border:3px solid var(--gold);border-radius:16px;
+  padding:20px;width:90%;max-width:340px;text-align:center;
+  box-shadow:0 0 50px rgba(255,214,0,.5);
+}
+#quizTitle{font-size:1.1rem;color:var(--gold);margin-bottom:8px;text-shadow:2px 2px 0 #000;}
+#quizQ{font-size:.72rem;color:#b0d4ff;line-height:1.6;margin-bottom:14px;min-height:44px;}
+.qrow{display:flex;gap:10px;}
+.qbtn{
+  flex:1;padding:12px 4px;border-radius:10px;border:none;
+  font-family:'Fredoka One',cursive;font-size:1rem;cursor:pointer;
+  touch-action:manipulation;transition:transform .1s;
+}
+.qbtn:active{transform:scale(.94);}
+#qTrue{background:linear-gradient(135deg,#00c853,#69f0ae);color:#000;}
+#qFalse{background:linear-gradient(135deg,#d50000,#ff5252);color:#fff;}
+#quizFeedback{margin-top:10px;font-size:.65rem;line-height:1.5;color:#fff;display:none;font-family:sans-serif;}
+#quizNext{
+  margin-top:10px;display:none;
+  background:linear-gradient(135deg,var(--gold),#ff8f00);color:#000;
+  border:none;border-radius:8px;padding:10px 20px;
+  font-family:'Fredoka One',cursive;font-size:.9rem;cursor:pointer;
+}
+</style>
+</head>
+<body>
+
+<!-- Decorative hills -->
+<div id="hills">
+  <svg viewBox="0 0 400 60" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="80"  cy="70" rx="130" ry="55" fill="#2e7d32"/>
+    <ellipse cx="300" cy="70" rx="160" ry="50" fill="#388e3c"/>
+    <ellipse cx="200" cy="75" rx="200" ry="45" fill="#43a047"/>
+  </svg>
+</div>
+
+<div id="header">
+  <h1>TETRI <span>Sélectif !</span></h1>
+  <p>Apprendre à trier n'a jamais été aussi simple !</p>
+</div>
+
+<div id="statsBar">
+  <div class="sbox"><div class="slabel">Score</div><div class="sval" id="scoreVal">0</div></div>
+  <div class="sbox"><div class="slabel">♻ Recyclages</div><div class="sval" id="recycleVal">0</div></div>
+</div>
+
+<div id="layout">
+  <div id="middle">
+
+    <!-- BOARD -->
+    <div id="boardWrap">
+      <canvas id="gameCanvas"></canvas>
+      <div id="bonusFlash"></div>
+      <div id="msgBanner">
+        <h2 id="msgTitle">TETRI Sélectif !</h2>
+        <p id="msgSub">Regroupe 20 blocs du même type !
+Chaque bloc = 10 pts.
+3 types différents → question 🔨</p>
+        <button class="bigbtn" id="msgBtn" onclick="startGame()">▶ Jouer</button>
+      </div>
+    </div>
+
+    <!-- SIDE PANEL -->
+    <div id="side">
+
+      <div class="card" id="nextCard">
+        <div class="ctitle">Suivant</div>
+        <canvas id="nextCanvas" width="72" height="72"></canvas>
+      </div>
+
+      <div class="card" id="hamCard">
+        <div class="ctitle">Marteau</div>
+        <span id="hamEmoji">🔨</span>
+        <span id="hamTxt">×<span id="hamSpan">0</span></span>
+        <button class="hbtn huse" onclick="activateHammer()">Utiliser</button>
+        <button class="hbtn hcancel" id="hamCancel" onclick="cancelHammer()">✕ Annuler</button>
+      </div>
+
+      <div class="card" id="progCard">
+        <div class="ctitle">🔨 Prochain</div>
+        <div id="progBar"><div id="progFill"></div></div>
+        <div id="progLabel">0/3 types recyclés</div>
+        <div id="tipTxt">Regroupe 20 blocs !</div>
+      </div>
+
+      <div class="card" id="legCard">
+        <div class="ctitle">Légende</div>
+        <div class="lrow"><span class="ldot" style="background:#FFDD00"></span>🧴 Plastique</div>
+        <div class="lrow"><span class="ldot" style="background:#4FC3F7"></span>📄 Papier</div>
+        <div class="lrow"><span class="ldot" style="background:#66BB6A"></span>🍾 Verre</div>
+        <div class="lrow"><span class="ldot" style="background:#EF9A9A"></span>🥫 Métal</div>
+        <div class="lrow"><span class="ldot" style="background:#A5D6A7"></span>🍂 Organique</div>
+        <div class="lrow"><span class="ldot" style="background:#CE93D8"></span>🗑️ Ordures</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- CONTROLS -->
+  <div id="controls">
+    <div class="crow">
+      <button class="cbtn" id="btnHammer" disabled onclick="onHammerBtn()">🔨 Marteau</button>
+    </div>
+    <div class="crow">
+      <button class="cbtn" ontouchstart="startRep('left',event)"  ontouchend="stopRep()" onmousedown="startRep('left',event)"  onmouseup="stopRep()">◀</button>
+      <button class="cbtn" ontouchstart="onRot(event)" onmousedown="onRot(event)">↻</button>
+      <button class="cbtn" ontouchstart="startRep('right',event)" ontouchend="stopRep()" onmousedown="startRep('right',event)" onmouseup="stopRep()">▶</button>
+    </div>
+    <div class="crow">
+      <button class="cbtn" style="max-width:148px" ontouchstart="startRep('down',event)" ontouchend="stopRep()" onmousedown="startRep('down',event)" onmouseup="stopRep()">▼ Bas</button>
+      <button class="cbtn" style="max-width:148px" ontouchstart="onDrop(event)" onmousedown="onDrop(event)">⬇ Chute</button>
+    </div>
+  </div>
+</div>
+
+<!-- QUIZ -->
+<div id="quizModal">
+  <div id="quizBox">
+    <div id="quizTitle">🔨 Gagne un Marteau !</div>
+    <div id="quizQ"></div>
+    <div class="qrow">
+      <button class="qbtn" id="qTrue"  onclick="answerQuiz(true)">✅ VRAI</button>
+      <button class="qbtn" id="qFalse" onclick="answerQuiz(false)">❌ FAUX</button>
+    </div>
+    <div id="quizFeedback"></div>
+    <button id="quizNext" onclick="closeQuiz()">Continuer ▶</button>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+//  CONFIG
+// ══════════════════════════════════════════════
+const COLS=10, ROWS=18;
+
+const TYPES=[
+  {id:1,name:'Plastique', color:'#FFDD00',shade:'#c8a800',glow:'#ffe033',emoji:'🧴'},
+  {id:2,name:'Papier',    color:'#4FC3F7',shade:'#0288d1',glow:'#29b6f6',emoji:'📄'},
+  {id:3,name:'Verre',     color:'#66BB6A',shade:'#2e7d32',glow:'#81c784',emoji:'🍾'},
+  {id:4,name:'Métal',     color:'#EF9A9A',shade:'#c62828',glow:'#e57373',emoji:'🥫'},
+  {id:5,name:'Organique', color:'#A5D6A7',shade:'#388e3c',glow:'#80c883',emoji:'🍂'},
+  {id:6,name:'Ordures',   color:'#CE93D8',shade:'#7b1fa2',glow:'#ba68c8',emoji:'🗑️'},
+];
+const RECYCLED={1:'🍶',2:'📦',3:'🏺',4:'🔩',5:'🌱',6:'🧱'};
+
+const SHAPES=[
+  [[1,1,1,1]],
+  [[1,1],[1,1]],
+  [[0,1,0],[1,1,1]],
+  [[1,0,0],[1,1,1]],
+  [[0,0,1],[1,1,1]],
+  [[0,1,1],[1,1,0]],
+  [[1,1,0],[0,1,1]],
+];
+
+// SRS wall-kick offsets
+const KICKS=[
+  [{x:0,y:0},{x:-1,y:0},{x:-1,y:-1},{x:0,y:2},{x:-1,y:2}],
+  [{x:0,y:0},{x:1,y:0},{x:1,y:1},{x:0,y:-2},{x:1,y:-2}],
+  [{x:0,y:0},{x:1,y:0},{x:1,y:-1},{x:0,y:2},{x:1,y:2}],
+  [{x:0,y:0},{x:-1,y:0},{x:-1,y:1},{x:0,y:-2},{x:-1,y:-2}],
+];
+
+const TIPS=[
+  "🔬 Les centres de tri utilisent des capteurs optiques pour séparer les matériaux.",
+  "⚠️ Une seule erreur peut contaminer tout un lot de recyclables.",
+  "♻️ Les bouteilles PET sont parmi les emballages les plus recyclés.",
+  "🚫 Ne pas imbriquer les emballages, chaque matériau doit être identifié.",
+  "💧 Vider et rincer légèrement suffit — pas besoin de laver.",
+  "✂️ Séparer les matériaux d'un emballage si possible.",
+  "👟 Écraser les bouteilles plastiques pour gagner de la place.",
+  "🚯 Ne jamais mettre un sac fermé dans la poubelle de tri.",
+  "📍 Les consignes varient selon les communes.",
+];
+
+const QUIZ=[
+  {q:"Les déchets souillés (emballages tachés, boîtes grasses) sont désormais autorisés dans les bacs de tri.",ans:true,
+   exp:"✅ VRAI — Depuis 2022, les centres de tri modernes acceptent tous les emballages même légèrement souillés. Seuls les déchets très contaminés restent dans la poubelle ordinaire."},
+  {q:"Le verre peut être recyclé à l'infini sans perdre en qualité.",ans:true,
+   exp:"✅ VRAI — Contrairement au plastique qui se dégrade à chaque recyclage, le verre peut être fondu et reformé indéfiniment sans altération de ses propriétés."},
+  {q:"Le bouchon d'une bouteille en plastique doit être retiré et jeté séparément avant de mettre la bouteille dans le bac jaune.",ans:false,
+   exp:"❌ FAUX — Les bouchons vissés sont traités avec la bouteille. Seuls, ils sont trop petits pour être détectés par les chaînes de tri automatisées."},
+  {q:"Les mouchoirs en papier usagés peuvent être jetés dans le bac de tri sélectif jaune.",ans:false,
+   exp:"❌ FAUX — Souillés et trop fins, les mouchoirs usagés ne peuvent pas être recyclés et doivent aller dans la poubelle ordinaire."},
+  {q:"Le recyclage est la méthode la plus efficace pour limiter les pertes de matières.",ans:false,
+   exp:"❌ FAUX — La consigne est plus efficace car elle réutilise directement le contenant (jusqu'à 50 fois) sans le transformer, contrairement au recyclage qui consomme de l'énergie."},
+];
+
+// ══════════════════════════════════════════════
+//  CANVAS
+// ══════════════════════════════════════════════
+const canvas  = document.getElementById('gameCanvas');
+const ctx     = canvas.getContext('2d');
+const ncanvas = document.getElementById('nextCanvas');
+const nctx    = ncanvas.getContext('2d');
+let BLOCK=20;
+
+function sizeCanvas(){
+  const middle=document.getElementById('middle');
+  const side=document.getElementById('side');
+  const mRect=middle.getBoundingClientRect();
+  const sRect=side.getBoundingClientRect();
+  const availW=mRect.width-sRect.width-5-12;
+  const availH=mRect.height-6;
+  const bW=Math.floor(availW/COLS);
+  const bH=Math.floor(availH/ROWS);
+  BLOCK=Math.max(12,Math.min(bW,bH));
+  canvas.width=COLS*BLOCK;
+  canvas.height=ROWS*BLOCK;
+}
+
+// ══════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════
+let board,current,next;
+let score=0,recycleCount=0,hammerCount=0;
+let correctAnswers=0;   // bonnes réponses accumulées (3 → marteau)
+let lastQuizIdx=-1;     // index de la dernière question posée (anti-répétition)
+let quizPending=false;  // quiz en attente après animation
+let gameRunning=false,hammerMode=false;
+let dropInterval=800,accumulator=0,lastTS=0,rafId=null;
+
+// ══════════════════════════════════════════════
+//  INIT / START
+// ══════════════════════════════════════════════
+function makeBoard(){return Array.from({length:ROWS},()=>Array(COLS).fill(0));}
+
+function init(){
+  requestAnimationFrame(()=>{
+    sizeCanvas();
+    board=makeBoard();
+    score=0;recycleCount=0;hammerCount=0;
+    correctAnswers=0;lastQuizIdx=-1;quizPending=false;
+    gameRunning=false;hammerMode=false;
+    updateUI();updateHammerUI();
+    next=spawnPiece();drawBoard();drawNext();
+    showMsg('TETRI Sélectif !',
+      'Regroupe 15 blocs du même type !\nChaque recyclage → question V/F.\n3 bonnes réponses → 🔨 Marteau',
+      '▶ Jouer');
+  });
+}
+
+function startGame(){
+  hideBanner();
+  sizeCanvas();
+  board=makeBoard();
+  score=0;recycleCount=0;hammerCount=0;
+  correctAnswers=0;lastQuizIdx=-1;quizPending=false;
+  hammerMode=false;
+  canvas.classList.remove('hammer-mode');
+  document.getElementById('progFill').style.width='0%';
+  document.getElementById('progLabel').textContent='0/3 bonnes réponses → 🔨';
+  updateUI();updateHammerUI();
+  current=spawnPiece();next=spawnPiece();drawNext();
+  gameRunning=true;dropInterval=800;accumulator=0;lastTS=performance.now();
+  cancelAnimationFrame(rafId);
+  rafId=requestAnimationFrame(loop);
+  showTip();
+}
+
+window.addEventListener('resize',()=>{sizeCanvas();if(board)drawBoard();});
+
+// ══════════════════════════════════════════════
+//  LOOP
+// ══════════════════════════════════════════════
+function loop(ts){
+  if(!gameRunning)return;
+  accumulator+=ts-lastTS;lastTS=ts;
+  if(!hammerMode&&accumulator>=dropInterval){accumulator=0;stepDown();}
+  drawBoard();
+  rafId=requestAnimationFrame(loop);
+}
+
+// ══════════════════════════════════════════════
+//  PIECES
+// ══════════════════════════════════════════════
+function spawnPiece(){
+  const shape=SHAPES[Math.floor(Math.random()*SHAPES.length)];
+  const type=TYPES[Math.floor(Math.random()*TYPES.length)];
+  return{shape,type,x:Math.floor(COLS/2)-Math.floor(shape[0].length/2),y:0,rot:0};
+}
+function hits(p,dx=0,dy=0,sh=null){
+  const s=sh||p.shape;
+  for(let r=0;r<s.length;r++)for(let c=0;c<s[r].length;c++)if(s[r][c]){
+    const nx=p.x+c+dx,ny=p.y+r+dy;
+    if(nx<0||nx>=COLS||ny>=ROWS)return true;
+    if(ny>=0&&board[ny][nx])return true;
+  }return false;
+}
+function stepDown(){if(hits(current,0,1))place();else current.y++;}
+function doLeft(){if(gameRunning&&!hammerMode&&!hits(current,-1,0))current.x--;}
+function doRight(){if(gameRunning&&!hammerMode&&!hits(current,1,0))current.x++;}
+function doRotate(){
+  if(!gameRunning||hammerMode)return;
+  const rot=current.shape[0].map((_,i)=>current.shape.map(r=>r[i]).reverse());
+  for(const k of KICKS[current.rot%4]){
+    if(!hits(current,k.x,k.y,rot)){
+      current.shape=rot;current.x+=k.x;current.y+=k.y;
+      current.rot=(current.rot+1)%4;return;
+    }
+  }
+}
+function doHardDrop(){
+  if(!gameRunning||hammerMode)return;
+  while(!hits(current,0,1))current.y++;
+  place();
+}
+function place(){
+  for(let r=0;r<current.shape.length;r++)for(let c=0;c<current.shape[r].length;c++)
+    if(current.shape[r][c]){
+      const ny=current.y+r,nx=current.x+c;
+      if(ny<0){endGame();return;}
+      board[ny][nx]=current.type.id;
+    }
+  checkGroups();
+  current=next;next=spawnPiece();drawNext();
+  if(hits(current)){endGame();return;}
+  showTip();
+}
+
+// ══════════════════════════════════════════════
+//  GROUP CHECK (15+ = recycle)
+// ══════════════════════════════════════════════
+function checkGroups(){
+  const vis=makeBoard();
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      if(vis[r][c]||!board[r][c])continue;
+      const tid=board[r][c],group=[],q=[[r,c]];
+      while(q.length){
+        const[cr,cc]=q.pop();
+        if(cr<0||cr>=ROWS||cc<0||cc>=COLS)continue;
+        if(vis[cr][cc]||board[cr][cc]!==tid)continue;
+        vis[cr][cc]=1;group.push([cr,cc]);
+        q.push([cr-1,cc],[cr+1,cc],[cr,cc-1],[cr,cc+1]);
+      }
+      if(group.length>=15){
+        group.forEach(([gr,gc])=>board[gr][gc]=0);
+        const pts=group.length*10;
+        score+=pts;recycleCount++;
+        animateRecycle(group,tid,pts);
+        updateUI();
+        // Pause + quiz after every recycle
+        if(!quizPending){
+          quizPending=true;
+          gameRunning=false;cancelAnimationFrame(rafId);
+          setTimeout(()=>triggerQuiz(),1200);
+        }
+      }
+    }
+  }
+}
+
+// ══════════════════════════════════════════════
+//  RECYCLE ANIMATION (blocs → bin)
+// ══════════════════════════════════════════════
+function animateRecycle(group,tid,pts){
+  if(!quizPending){gameRunning=false;cancelAnimationFrame(rafId);}
+  const t=TYPES.find(t=>t.id===tid);
+  const binX=canvas.width/2,binY=canvas.height-BLOCK;
+  const TOTAL=26;
+  const particles=group.map(([gr,gc])=>({sx:(gc+.5)*BLOCK,sy:(gr+.5)*BLOCK}));
+  let frame=0;
+  const anim=setInterval(()=>{
+    drawBoard();
+    const ease=1-Math.pow(1-frame/TOTAL,3);
+    drawBin(ctx,binX,binY,t.color,Math.min(1,frame/6),Math.min(1,frame/4));
+    particles.forEach(p=>{
+      const px=p.sx+(binX-p.sx)*ease;
+      const py=p.sy+(binY-p.sy)*ease;
+      const a=Math.max(0,1-ease*1.1);
+      const sz=BLOCK*(1-ease*.6);
+      ctx.save();ctx.globalAlpha=a;
+      ctx.fillStyle=t.color;ctx.shadowBlur=8;ctx.shadowColor=t.glow;
+      ctx.fillRect(px-sz/2,py-sz/2,sz,sz);ctx.restore();
+    });
+    if(frame>TOTAL*.5){
+      const pa=Math.min(1,(frame-TOTAL*.5)/(TOTAL*.3));
+      const py2=binY-(frame-TOTAL*.5)*2.2;
+      ctx.save();ctx.globalAlpha=pa;
+      ctx.font=`bold ${Math.round(BLOCK*.85)}px 'Fredoka One',cursive`;
+      ctx.fillStyle='#FFD600';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.shadowBlur=10;ctx.shadowColor='#ff8f00';
+      ctx.fillText('+'+pts+' pts',binX,py2);ctx.restore();
+    }
+    frame++;
+    if(frame>=TOTAL){
+      clearInterval(anim);
+      flashBonus(t.emoji+' '+group.length+' blocs dans la poubelle '+t.name+' ! +'+pts+' pts');
+      drawBoard();
+      if(!quizTriggered){
+        setTimeout(()=>{
+          gameRunning=true;lastTS=performance.now();accumulator=0;
+          rafId=requestAnimationFrame(loop);
+        },300);
+      }
+    }
+  },35);
+}
+
+function drawBin(c2d,x,y,color,scale=1,alpha=1){
+  if(scale<=0)return;
+  c2d.save();c2d.globalAlpha=alpha;c2d.translate(x,y);c2d.scale(scale,scale);
+  const w=BLOCK*2.2,h=BLOCK*2.4,lid=BLOCK*.45;
+  c2d.shadowBlur=16;c2d.shadowColor=color;
+  c2d.beginPath();
+  c2d.moveTo(-w*.43,-h*.08);c2d.lineTo(-w*.5,h*.5);
+  c2d.lineTo(w*.5,h*.5);c2d.lineTo(w*.43,-h*.08);c2d.closePath();
+  c2d.fillStyle=shade(color,-55);c2d.fill();
+  c2d.strokeStyle=color;c2d.lineWidth=2;c2d.stroke();
+  c2d.fillStyle=color;c2d.fillRect(-w*.52,-h*.08-lid,w*1.04,lid);
+  c2d.strokeStyle=shade(color,40);c2d.lineWidth=1.5;
+  c2d.strokeRect(-w*.52,-h*.08-lid,w*1.04,lid);
+  c2d.fillStyle=shade(color,30);c2d.fillRect(-w*.11,-h*.08-lid*1.55,w*.22,lid*.65);
+  c2d.shadowBlur=0;
+  c2d.font=`${Math.round(BLOCK*.8)}px serif`;
+  c2d.textAlign='center';c2d.textBaseline='middle';c2d.globalAlpha=alpha*.65;
+  c2d.fillText('♻️',0,h*.2);c2d.restore();
+}
+
+// ══════════════════════════════════════════════
+//  HAMMER
+// ══════════════════════════════════════════════
+function onHammerBtn(){
+  if(!gameRunning&&!hammerMode)return;
+  hammerMode?cancelHammer():activateHammer();
+}
+function activateHammer(){
+  if(hammerCount<=0||!gameRunning)return;
+  hammerMode=true;canvas.classList.add('hammer-mode');
+  document.getElementById('btnHammer').classList.add('active-h');
+  document.getElementById('btnHammer').textContent='✕ Annuler';
+  document.getElementById('hamCancel').style.display='block';
+  flashBonus('🔨 Touche une zone à recycler !');drawBoard();
+}
+function cancelHammer(){
+  hammerMode=false;canvas.classList.remove('hammer-mode');
+  document.getElementById('btnHammer').classList.remove('active-h');
+  document.getElementById('btnHammer').textContent='🔨 Marteau';
+  document.getElementById('hamCancel').style.display='none';drawBoard();
+}
+function useHammerAt(row,col){
+  if(!hammerMode||!gameRunning)return;
+  const tid=board[row][col];if(!tid){cancelHammer();return;}
+  const vis=makeBoard(),group=[],q=[[row,col]];
+  while(q.length){
+    const[cr,cc]=q.pop();
+    if(cr<0||cr>=ROWS||cc<0||cc>=COLS)continue;
+    if(vis[cr][cc]||board[cr][cc]!==tid)continue;
+    vis[cr][cc]=1;group.push([cr,cc]);
+    q.push([cr-1,cc],[cr+1,cc],[cr,cc-1],[cr,cc+1]);
+  }
+  hammerCount--;
+  hammerMode=false;canvas.classList.remove('hammer-mode');
+  document.getElementById('btnHammer').classList.remove('active-h');
+  document.getElementById('btnHammer').textContent='🔨 Marteau';
+  document.getElementById('hamCancel').style.display='none';
+  updateHammerUI();
+  gameRunning=false;cancelAnimationFrame(rafId);
+  group.forEach(([gr,gc])=>board[gr][gc]=0);
+  const pts=group.length*10;score+=pts;recycleCount++;
+  updateUI();
+  animateHammerStrike(group,tid,pts);
+}
+function animateHammerStrike(group,tid,pts){
+  const t=TYPES.find(t=>t.id===tid);
+  const binX=canvas.width/2,binY=canvas.height-BLOCK;
+  const TOTAL=20;
+  const particles=group.map(([gr,gc])=>({sx:(gc+.5)*BLOCK,sy:(gr+.5)*BLOCK}));
+  let frame=0;
+  const anim=setInterval(()=>{
+    drawBoard();
+    const ease=1-Math.pow(1-frame/TOTAL,3);
+    drawBin(ctx,binX,binY,t.color,Math.min(1,frame/6),Math.min(1,frame/4));
+    particles.forEach(p=>{
+      const px=p.sx+(binX-p.sx)*ease;
+      const py=p.sy+(binY-p.sy)*ease;
+      const a=Math.max(0,1-ease*1.1);
+      const sz=BLOCK*(1-ease*.6);
+      ctx.save();ctx.globalAlpha=a;
+      ctx.fillStyle=t.color;ctx.shadowBlur=8;ctx.shadowColor=t.glow;
+      ctx.fillRect(px-sz/2,py-sz/2,sz,sz);ctx.restore();
+    });
+    if(frame>TOTAL*.5){
+      const pa=Math.min(1,(frame-TOTAL*.5)/(TOTAL*.3));
+      const py2=binY-(frame-TOTAL*.5)*2.5;
+      ctx.save();ctx.globalAlpha=pa;
+      ctx.font=`bold ${Math.round(BLOCK*.85)}px 'Fredoka One',cursive`;
+      ctx.fillStyle='#FFD600';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.shadowBlur=10;ctx.shadowColor='#ff8f00';
+      ctx.fillText('+'+pts+' pts',binX,py2);ctx.restore();
+    }
+    frame++;
+    if(frame>=TOTAL){
+      clearInterval(anim);
+      flashBonus('🔨 '+t.emoji+' '+group.length+' blocs recyclés ! +'+pts+' pts');
+      drawBoard();
+      setTimeout(()=>{
+        gameRunning=true;lastTS=performance.now();accumulator=0;
+        rafId=requestAnimationFrame(loop);
+      },300);
+    }
+  },35);
+}
+
+// ══════════════════════════════════════════════
+//  QUIZ
+// ══════════════════════════════════════════════
+let activeQ=null;
+function triggerQuiz(){
+  // Pick a random question different from the last one shown
+  let idx;
+  do { idx=Math.floor(Math.random()*QUIZ.length); }
+  while(QUIZ.length>1 && idx===lastQuizIdx);
+  lastQuizIdx=idx;
+  activeQ=QUIZ[idx];
+  document.getElementById('quizQ').textContent=activeQ.q;
+  document.getElementById('quizFeedback').style.display='none';
+  document.getElementById('quizNext').style.display='none';
+  document.getElementById('qTrue').disabled=false;
+  document.getElementById('qFalse').disabled=false;
+  document.getElementById('quizModal').classList.add('show');
+}
+function answerQuiz(ans){
+  if(!activeQ)return;
+  document.getElementById('qTrue').disabled=true;
+  document.getElementById('qFalse').disabled=true;
+  const ok=ans===activeQ.ans;
+  const fb=document.getElementById('quizFeedback');
+  if(ok){
+    correctAnswers++;
+    const hammerEarned=Math.floor(correctAnswers/3);
+    const prev=Math.floor((correctAnswers-1)/3);
+    if(hammerEarned>prev){
+      // Multiple of 3 reached → award hammer
+      hammerCount++;updateHammerUI();
+      fb.textContent=activeQ.exp+'\n\n🔨 3 bonnes réponses — Marteau gagné !';
+    } else {
+      fb.textContent=activeQ.exp+'\n\n✅ Bonne réponse ! ('+correctAnswers+'/3 vers le marteau)';
+    }
+    fb.style.color='#69f0ae';
+  } else {
+    fb.textContent=activeQ.exp+'\n\n❌ Mauvaise réponse. ('+correctAnswers+'/3 vers le marteau)';
+    fb.style.color='#ff8a80';
+  }
+  fb.style.display='block';
+  document.getElementById('quizNext').style.display='block';
+}
+function closeQuiz(){
+  document.getElementById('quizModal').classList.remove('show');
+  activeQ=null; quizPending=false;
+  updateUI();
+  gameRunning=true;lastTS=performance.now();accumulator=0;
+  rafId=requestAnimationFrame(loop);
+}
+
+// ══════════════════════════════════════════════
+//  UI
+// ══════════════════════════════════════════════
+function updateUI(){
+  document.getElementById('scoreVal').textContent=score.toLocaleString('fr-FR');
+  document.getElementById('recycleVal').textContent=recycleCount;
+  const inCycle=correctAnswers%3;
+  const pct=(inCycle/3)*100;
+  document.getElementById('progFill').style.width=pct+'%';
+  document.getElementById('progLabel').textContent=inCycle+'/3 bonnes réponses → 🔨';
+}
+function updateHammerUI(){
+  const card=document.getElementById('hamCard');
+  card.style.display=hammerCount>0?'block':'none';
+  document.getElementById('hamSpan').textContent=hammerCount;
+  const b=document.getElementById('btnHammer');b.disabled=hammerCount<=0;
+  if(!hammerMode)b.textContent='🔨 Marteau';
+}
+function flashBonus(msg){
+  const el=document.getElementById('bonusFlash');
+  el.textContent=msg;el.style.opacity='1';
+  clearTimeout(flashBonus._t);
+  flashBonus._t=setTimeout(()=>el.style.opacity='0',2200);
+}
+let tipIdx=0;
+function showTip(){
+  document.getElementById('tipTxt').textContent=TIPS[tipIdx%TIPS.length];tipIdx++;
+}
+function showMsg(title,sub,btn){
+  document.getElementById('msgTitle').textContent=title;
+  document.getElementById('msgSub').textContent=sub;
+  document.getElementById('msgBtn').textContent=btn;
+  document.getElementById('msgBanner').style.display='block';
+}
+function hideBanner(){document.getElementById('msgBanner').style.display='none';}
+function endGame(){
+  gameRunning=false;cancelAnimationFrame(rafId);
+  hammerMode=false;canvas.classList.remove('hammer-mode');
+  drawBoard();
+  setTimeout(()=>{
+    showMsg('Game Over !',
+      'Score : '+score.toLocaleString('fr-FR')+' pts\n'+recycleCount+' recyclage(s) réussi(s) !',
+      '↺ Rejouer');
+    document.getElementById('msgBtn').onclick=startGame;
+  },400);
+}
+function shade(hex,p){
+  const n=parseInt(hex.replace('#',''),16);
+  return `rgb(${Math.max(0,Math.min(255,(n>>16)+p))},${Math.max(0,Math.min(255,((n>>8)&0xff)+p))},${Math.max(0,Math.min(255,(n&0xff)+p))})`;
+}
+
+// ══════════════════════════════════════════════
+//  DRAW
+// ══════════════════════════════════════════════
+function drawBoard(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.strokeStyle='rgba(100,160,255,.15)';ctx.lineWidth=.5;
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)
+    ctx.strokeRect(c*BLOCK,r*BLOCK,BLOCK,BLOCK);
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)
+    if(board[r][c])drawCell(ctx,c,r,board[r][c]);
+  if(current&&gameRunning&&!hammerMode){
+    let gy=current.y;
+    while(!hits({...current,y:gy+1}))gy++;
+    drawPiece(ctx,{...current,y:gy},.15);
+    drawPiece(ctx,current,1);
+  }
+  if(hammerMode){
+    ctx.save();ctx.fillStyle='rgba(0,0,0,.3)';
+    ctx.fillRect(0,0,canvas.width,canvas.height);ctx.restore();
+    for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)
+      if(board[r][c])drawCell(ctx,c,r,board[r][c]);
+    ctx.save();ctx.font=`${Math.round(BLOCK*1.2)}px serif`;
+    ctx.textAlign='center';ctx.textBaseline='middle';ctx.globalAlpha=.6;
+    ctx.fillText('🔨',canvas.width/2,canvas.height-BLOCK*1.1);ctx.restore();
+  }
+}
+
+function drawCell(c2d,x,y,tid,alpha=1){
+  const t=TYPES.find(t=>t.id===tid);if(!t)return;
+  const px=x*BLOCK,py=y*BLOCK;
+  c2d.save();c2d.globalAlpha=alpha;
+  const g=c2d.createLinearGradient(px,py,px+BLOCK,py+BLOCK);
+  g.addColorStop(0,t.color);g.addColorStop(1,shade(t.color,-40));
+  c2d.fillStyle=g;c2d.fillRect(px+1,py+1,BLOCK-2,BLOCK-2);
+  c2d.strokeStyle=t.glow;c2d.lineWidth=1.5;
+  c2d.shadowBlur=5;c2d.shadowColor=t.glow;
+  c2d.strokeRect(px+1,py+1,BLOCK-2,BLOCK-2);c2d.shadowBlur=0;
+  // Emoji — large, white with shadow
+  c2d.font=`${Math.round(BLOCK*.7)}px serif`;
+  c2d.textAlign='center';c2d.textBaseline='middle';
+  c2d.shadowColor='rgba(0,0,0,.8)';c2d.shadowBlur=3;
+  c2d.globalAlpha=alpha;c2d.fillStyle='#fff';
+  c2d.fillText(t.emoji,px+BLOCK/2,py+BLOCK/2+1);
+  c2d.shadowBlur=0;c2d.restore();
+}
+
+function drawPiece(c2d,piece,alpha){
+  piece.shape.forEach((row,r)=>row.forEach((v,c)=>{
+    if(v)drawCell(c2d,piece.x+c,piece.y+r,piece.type.id,alpha);
+  }));
+}
+
+function drawNext(){
+  const W=ncanvas.width,H=ncanvas.height;
+  nctx.clearRect(0,0,W,H);if(!next)return;
+  const cols=next.shape[0].length,rows=next.shape.length;
+  const bk=Math.min(Math.floor((W-4)/cols),Math.floor((H-4)/rows));
+  const ox=Math.floor((W-cols*bk)/2),oy=Math.floor((H-rows*bk)/2);
+  const t=next.type;
+  next.shape.forEach((row,r)=>row.forEach((v,c)=>{
+    if(!v)return;
+    const px=ox+c*bk,py=oy+r*bk;
+    const g=nctx.createLinearGradient(px,py,px+bk,py+bk);
+    g.addColorStop(0,t.color);g.addColorStop(1,shade(t.color,-40));
+    nctx.fillStyle=g;nctx.fillRect(px+1,py+1,bk-2,bk-2);
+    nctx.strokeStyle=t.glow;nctx.lineWidth=1.5;
+    nctx.shadowBlur=5;nctx.shadowColor=t.glow;
+    nctx.strokeRect(px+1,py+1,bk-2,bk-2);nctx.shadowBlur=0;
+    nctx.font=`${Math.round(bk*.65)}px serif`;
+    nctx.textAlign='center';nctx.textBaseline='middle';
+    nctx.shadowColor='rgba(0,0,0,.8)';nctx.shadowBlur=2;
+    nctx.fillStyle='#fff';
+    nctx.fillText(t.emoji,px+bk/2,py+bk/2+1);
+    nctx.shadowBlur=0;
+  }));
+}
+
+// ══════════════════════════════════════════════
+//  INPUT
+// ══════════════════════════════════════════════
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&hammerMode){cancelHammer();return;}
+  if(!gameRunning)return;
+  switch(e.key){
+    case'ArrowLeft': e.preventDefault();doLeft();break;
+    case'ArrowRight':e.preventDefault();doRight();break;
+    case'ArrowDown': e.preventDefault();stepDown();break;
+    case'ArrowUp':   e.preventDefault();doRotate();break;
+    case' ':         e.preventDefault();doHardDrop();break;
+    case'h':case'H':onHammerBtn();break;
+  }
+});
+
+function canvasCell(cx,cy){
+  const r=canvas.getBoundingClientRect();
+  const sx=canvas.width/r.width,sy=canvas.height/r.height;
+  return{row:Math.floor((cy-r.top)*sy/BLOCK),col:Math.floor((cx-r.left)*sx/BLOCK)};
+}
+canvas.addEventListener('click',e=>{
+  if(!hammerMode)return;
+  const{row,col}=canvasCell(e.clientX,e.clientY);
+  if(row>=0&&row<ROWS&&col>=0&&col<COLS)useHammerAt(row,col);
+});
+canvas.addEventListener('touchstart',e=>{
+  if(!hammerMode)return;e.preventDefault();
+  const tc=e.touches[0];
+  const{row,col}=canvasCell(tc.clientX,tc.clientY);
+  if(row>=0&&row<ROWS&&col>=0&&col<COLS)useHammerAt(row,col);
+},{passive:false});
+
+let sx=0,sy=0,moved=false;
+canvas.addEventListener('touchstart',e=>{
+  if(hammerMode)return;sx=e.touches[0].clientX;sy=e.touches[0].clientY;moved=false;
+},{passive:true});
+canvas.addEventListener('touchmove',e=>{
+  if(hammerMode)return;
+  if(Math.abs(e.touches[0].clientX-sx)>8||Math.abs(e.touches[0].clientY-sy)>8)moved=true;
+},{passive:true});
+canvas.addEventListener('touchend',e=>{
+  if(hammerMode||!gameRunning)return;
+  const dx=e.changedTouches[0].clientX-sx,dy=e.changedTouches[0].clientY-sy;
+  const ax=Math.abs(dx),ay=Math.abs(dy);
+  if(!moved||(ax<8&&ay<8)){doRotate();return;}
+  if(ax>ay){dx>0?doRight():doLeft();}else{dy>0?doHardDrop():doRotate();}
+},{passive:true});
+
+let rT=null,rI=null;
+function startRep(dir,e){
+  e.preventDefault();
+  if(!gameRunning||hammerMode)return;
+  go(dir);clearTimeout(rT);clearInterval(rI);
+  rT=setTimeout(()=>{rI=setInterval(()=>go(dir),80);},200);
+}
+function stopRep(){clearTimeout(rT);clearInterval(rI);}
+function go(dir){
+  if(!gameRunning||hammerMode)return;
+  if(dir==='left')doLeft();else if(dir==='right')doRight();else stepDown();
+}
+function onRot(e){e.preventDefault();doRotate();}
+function onDrop(e){e.preventDefault();doHardDrop();}
+
+// ══════════════════════════════════════════════
+//  BOOT
+// ══════════════════════════════════════════════
+init();
+</script>
+</body>
+</html>
